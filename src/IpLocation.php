@@ -132,6 +132,46 @@ class IpLocation
         return $area;
     }
 
+    private function getIP()
+    {
+        static $realip = null;
+        if ($realip !== null) {
+            return $realip;
+        }
+        if (isset($_SERVER)) {
+            if (isset($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+                $arr = explode(',', $_SERVER['HTTP_X_FORWARDED_FOR']);
+                /* 取X-Forwarded-For中第x个非unknown的有效IP字符? */
+                foreach ($arr as $ip) {
+                    $ip = trim($ip);
+                    if ($ip != 'unknown') {
+                        $realip = $ip;
+                        break;
+                    }
+                }
+            } elseif (isset($_SERVER['HTTP_CLIENT_IP'])) {
+                $realip = $_SERVER['HTTP_CLIENT_IP'];
+            } else {
+                if (isset($_SERVER['REMOTE_ADDR'])) {
+                    $realip = $_SERVER['REMOTE_ADDR'];
+                } else {
+                    $realip = '0.0.0.0';
+                }
+            }
+        } else {
+            if (getenv('HTTP_X_FORWARDED_FOR')) {
+                $realip = getenv('HTTP_X_FORWARDED_FOR');
+            } elseif (getenv('HTTP_CLIENT_IP')) {
+                $realip = getenv('HTTP_CLIENT_IP');
+            } else {
+                $realip = getenv('REMOTE_ADDR');
+            }
+        }
+        preg_match("/[\d\.]{7,15}/", $realip, $onlineip);
+        $realip = !empty($onlineip[0]) ? $onlineip[0] : '0.0.0.0';
+        return $realip;
+    }
+
     /**
      * 根据所给 IP 地址或域名返回所在地区信息
      *
@@ -145,7 +185,7 @@ class IpLocation
             return null;
         }            // 如果数据文件没有被正确打开，则直接返回空
         if (empty($ip)) {
-            $ip = $_SERVER["HTTP_CLIENT_IP"];
+            $ip = $this->getIp();
         }
         //$ip = '58.54.182.231';
         $location['ip'] = gethostbyname($ip);   // 将输入的域名转化为IP地址
@@ -218,9 +258,9 @@ class IpLocation
             $location['area'] = '';
         }
 
-        $location = array_map(function($value){
-            return iconv('gbk','utf-8//ignore',$value);
-        },$location);
+        $location = array_map(function ($value) {
+            return iconv('gbk', 'utf-8//ignore', $value);
+        }, $location);
 
         return $location;
     }
